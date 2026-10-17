@@ -1,0 +1,34 @@
+# ---- Go ----
+bridge/xagent-bridge
+*.exe
+*.test
+*.out
+
+# ---- Node / Next.js ----
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+npm-debug.log*
+
+# ---- 运行时数据（SQLite / 上传附件 / 设备身份 / 会话缓存）----
+# 注意：openclaw-device/identity.json 含设备密钥，绝不能提交
+bridge/data/
+bridge/sessions.db
+bridge/sessions.db-*
+bridge/openclaw-*.json.bak
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ---- 本地产物 / 工具缓存 ----
+.playwright-cli/
+.mimocode/
+*.log
+nohup.out
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
