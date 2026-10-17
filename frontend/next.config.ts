@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 // 同源代理：浏览器只访问前端（:3000），/api/* 由 next 转发到本机 bridge。
@@ -10,6 +11,8 @@ const bridgeOrigin = process.env.BRIDGE_ORIGIN || "http://127.0.0.1:7860";
 const lowMem = process.env.NEXT_LOW_MEM === "1";
 
 const nextConfig: NextConfig = {
+  // 防止服务器上 /root 等多余 package-lock.json 被当成 workspace root
+  outputFileTracingRoot: path.join(__dirname),
   ...(lowMem
     ? {
         experimental: {
