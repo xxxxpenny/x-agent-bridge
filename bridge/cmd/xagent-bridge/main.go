@@ -31,8 +31,22 @@ func main() {
 	baseDir := filepath.Dir(exe)
 	dataDir := filepath.Join(baseDir, "data")
 
+	// agent 工作区：claude cwd + skills/mcp 落点，与 bridge 安装目录解耦。
+	// 默认 ~/.xagent-bridge/workspace；WORKSPACE 环境变量可覆盖。
+	workspace := os.Getenv("WORKSPACE")
+	if workspace == "" {
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
+			workspace = filepath.Join(home, ".xagent-bridge", "workspace")
+		} else {
+			workspace = filepath.Join(baseDir, "workspace")
+		}
+	}
+
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		log.Fatalf("data dir: %v", err)
+	}
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		log.Fatalf("workspace: %v", err)
 	}
 	db, err := persist.Open(filepath.Join(dataDir, "xagent.db"))
 	if err != nil {
@@ -58,7 +72,7 @@ func main() {
 	adapters := map[string]*core.AdapterRuntime{}
 	// memory 演示引擎仅在 DEV=true 时注册（生产不暴露）
 	if os.Getenv("DEV") == "true" {
-		adapters["memory"] = &core.AdapterRuntime{ID: "memory", Adapter: memory.NewAdapter(), Workspace: baseDir}
+		adapters["memory"] = &core.AdapterRuntime{ID: "memory", Adapter: memory.NewAdapter(), Workspace: workspace}
 		log.Printf("memory adapter registered (dev)")
 	}
 	// 引擎选择：默认走老链路（定制实现，快）；ACP 通过环境变量显式开启
@@ -77,21 +91,21 @@ func main() {
 	if claudeBin == "" {
 		log.Printf("claude-code: 未安装，跳过注册")
 	} else if engineFor("CLAUDE") == "legacy" {
-		if ca := claude.NewAdapter(baseDir, dataDir); ca != nil {
-			adapters["claude-code"] = &core.AdapterRuntime{ID: "claude-code", Adapter: ca, Workspace: baseDir}
+		if ca := claude.NewAdapter(workspace, dataDir); ca != nil {
+			adapters["claude-code"] = &core.AdapterRuntime{ID: "claude-code", Adapter: ca, Workspace: workspace}
 			log.Printf("claude-code adapter registered (legacy sdk)")
 		} else {
 			log.Printf("claude-code legacy adapter unavailable")
 		}
 	} else if npxBin == "" {
 		log.Printf("claude-code: 缺少 npx，acp 不可用 → 回落 legacy sdk")
-		if ca := claude.NewAdapter(baseDir, dataDir); ca != nil {
-			adapters["claude-code"] = &core.AdapterRuntime{ID: "claude-code", Adapter: ca, Workspace: baseDir}
+		if ca := claude.NewAdapter(workspace, dataDir); ca != nil {
+			adapters["claude-code"] = &core.AdapterRuntime{ID: "claude-code", Adapter: ca, Workspace: workspace}
 			log.Printf("claude-code adapter registered (legacy sdk)")
 		}
 	} else if ca := acp.NewAdapter("claude-code",
-		[]string{npxBin, "--yes", "@agentclientprotocol/claude-agent-acp"}, baseDir, dataDir); ca != nil {
-		adapters["claude-code"] = &core.AdapterRuntime{ID: "claude-code", Adapter: ca, Workspace: baseDir}
+		[]string{npxBin, "--yes", "@agentclientprotocol/claude-agent-acp"}, workspace, dataDir); ca != nil {
+		adapters["claude-code"] = &core.AdapterRuntime{ID: "claude-code", Adapter: ca, Workspace: workspace}
 		log.Printf("claude-code adapter registered (acp)")
 	} else {
 		log.Printf("claude-code acp adapter unavailable")
@@ -102,11 +116,11 @@ func main() {
 		log.Printf("openclaw: 未安装，跳过注册")
 	} else if engineFor("OPENCLAW") == "legacy" {
 		if oa := ocleg.NewAdapter(baseDir); oa != nil {
-			adapters["openclaw"] = &core.AdapterRuntime{ID: "openclaw", Adapter: oa, Workspace: baseDir}
+			adapters["openclaw"] = &core.AdapterRuntime{ID: "openclaw", Adapter: oa, Workspace: workspace}
 			log.Printf("openclaw adapter registered (legacy ws)")
 		}
-	} else if oa := acp.NewAdapter("openclaw", []string{openclawBin, "acp"}, baseDir, dataDir); oa != nil {
-		adapters["openclaw"] = &core.AdapterRuntime{ID: "openclaw", Adapter: oa, Workspace: baseDir}
+	} else if oa := acp.NewAdapter("openclaw", []string{openclawBin, "acp"}, workspace, dataDir); oa != nil {
+		adapters["openclaw"] = &core.AdapterRuntime{ID: "openclaw", Adapter: oa, Workspace: workspace}
 		log.Printf("openclaw adapter registered (acp)")
 	} else {
 		log.Printf("openclaw acp adapter unavailable")
@@ -122,6 +136,7 @@ func main() {
 		log.Printf("token auth enabled (health/OPTIONS exempt)")
 	}
 	log.Printf("xagent-bridge listening on http://%s", addr)
+	log.Printf("agent workspace: %s", workspace)
 	// model proxy 配置用：OpenAI 兼容，/{base}/chat/completions 与 /{base}/v1/chat/completions 均可
 	log.Printf("llm gateway baseUrl: http://%s/api/v1/llm  (OpenAI chat/completions + Anthropic /v1/messages；host=0.0.0.0 时云上换成服务器 IP/域名)", addr)
 	log.Fatal(http.ListenAndServe(addr, srv.Handler()))
