@@ -83,11 +83,15 @@ make e2e          # wire 级回归（需 bridge 已运行）
 # 生产式启动
 make start                  # 前台运行 bridge + 前端（Ctrl-C 一起退出）
 
-# 服务器部署：非回环绑定 + token 鉴权 + 前端指向公网地址（构建期内联）
-HOST=0.0.0.0 TOKEN=$(openssl rand -hex 16) BRIDGE_URL=http://<server-ip>:7860 make start
+# 服务器部署：非回环绑定 + token 鉴权（浏览器经 :3000 同源代理访问 bridge，无需 BRIDGE_URL）
+HOST=0.0.0.0 TOKEN=$(openssl rand -hex 16) make start
 # 或直接：./xagent-bridge --host 0.0.0.0 --token "$TOKEN"
 # curl: -H "Authorization: Bearer $TOKEN" ... ；前端打开会弹 token 门禁，填入即可
 ```
+
+**服务器 `next build` Bus error？** `make frontend-build` 默认已开 `NEXT_LOW_MEM=1`
+（关 SWC 并行 worker）+ `NODE_OPTIONS=--max-old-space-size=4096`。
+若仍崩溃：Docker 需 `--shm-size=1g`；确认 Node ≥ 20；本机可 `NEXT_LOW_MEM=0 make frontend-build` 恢复全速构建。
 
 引擎初始化（claude-code 登录 / openclaw onboard / HITL 审批配置 / LLM Gateway 接入）见
 **[docs/engines.md](docs/engines.md)**；HTTP 协议细节见 [docs/api-spec-v2.md](docs/api-spec-v2.md)。

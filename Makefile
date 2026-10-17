@@ -44,8 +44,15 @@ start: bridge frontend frontend-build
 	bash scripts/start.sh $(PORT)
 
 ## frontend-build: 构建前端生产包（BRIDGE_URL 非空时内联为 NEXT_PUBLIC_BRIDGE_URL）
+## 服务器部署：默认 NEXT_LOW_MEM=1 避 SWC Bus error；本机可 NEXT_LOW_MEM=0 make frontend-build
+NODE_OPTIONS ?= --max-old-space-size=4096
+NEXT_LOW_MEM ?= 1
 frontend-build:
-	cd $(FRONTEND_DIR) && NEXT_PUBLIC_BRIDGE_URL="$(BRIDGE_URL)" npm run build
+	cd $(FRONTEND_DIR) && \
+		NODE_OPTIONS="$(NODE_OPTIONS)" \
+		NEXT_LOW_MEM="$(NEXT_LOW_MEM)" \
+		NEXT_PUBLIC_BRIDGE_URL="$(BRIDGE_URL)" \
+		npm run build
 	@echo "✓ frontend build → $(FRONTEND_DIR)/.next (bridge=$(BRIDGE_URL:-default 127.0.0.1:7860))"
 
 ## e2e: 运行 wire 级回归（需 bridge 已在 :$(PORT) 运行）
